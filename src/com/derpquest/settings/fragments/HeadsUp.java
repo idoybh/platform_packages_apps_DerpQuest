@@ -15,6 +15,9 @@
  */
 package com.derpquest.settings.fragments;
 
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -23,6 +26,7 @@ import android.os.Bundle;
 import android.os.UserHandle;
 import android.provider.SearchIndexableResource;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 
@@ -42,7 +46,9 @@ import com.android.settings.SettingsPreferenceFragment;
 import com.android.settings.R;
 import com.android.settingslib.search.SearchIndexable;
 
+import com.derpquest.settings.preferences.AppMultiSelectListPreference;
 import com.derpquest.settings.preferences.CustomSeekBarPreference;
+import com.derpquest.settings.preferences.ScrollAppsViewPreference;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,6 +65,17 @@ public class HeadsUp extends SettingsPreferenceFragment implements
 
     private static final String PREF_HEADS_UP_SNOOZE_TIME = "heads_up_snooze_time";
     private static final String PREF_HEADS_UP_TIME_OUT = "heads_up_time_out";
+    private static final String PREF_STOPLIST_APPS_LIST_SCROLLER = "stoplist_apps_list_scroller";
+    private static final String PREF_BLACKLIST_APPS_LIST_SCROLLER = "blacklist_apps_list_scroller";
+    private static final String PREF_ADD_STOPLIST_PACKAGES = "add_stoplist_packages";
+    private static final String PREF_ADD_BLACKLIST_PACKAGES = "add_blacklist_packages";
+
+    private PackageListAdapter mPackageAdapter;
+    private PackageManager mPackageManager;
+    private AppMultiSelectListPreference mAddStoplistPref;
+    private AppMultiSelectListPreference mAddBlacklistPref;
+    private ScrollAppsViewPreference mStoplistScroller;
+    private ScrollAppsViewPreference mBlacklistScroller;
 
     private CustomSeekBarPreference mHeadsUpSnoozeTime;
     private CustomSeekBarPreference mHeadsUpTimeOut;
@@ -89,6 +106,43 @@ public class HeadsUp extends SettingsPreferenceFragment implements
         int headsUpTimeOut = Settings.System.getInt(getContentResolver(),
                 Settings.System.HEADS_UP_TIMEOUT, 5);
         mHeadsUpTimeOut.setValue(headsUpTimeOut);
+
+        // Get launch-able applications
+        mPackageManager = getPackageManager();
+        mPackageAdapter = new PackageListAdapter(getActivity());
+
+        mStoplistScroller = (ScrollAppsViewPreference) findPreference(PREF_STOPLIST_APPS_LIST_SCROLLER);
+        mBlacklistScroller = (ScrollAppsViewPreference) findPreference(PREF_BLACKLIST_APPS_LIST_SCROLLER);
+
+        mAddStoplistPref =  (AppMultiSelectListPreference) findPreference(PREF_ADD_STOPLIST_PACKAGES);
+        mAddBlacklistPref = (AppMultiSelectListPreference) findPreference(PREF_ADD_BLACKLIST_PACKAGES);
+
+        final String valuesBlacklistvaluesStoplist = Settings.System.getString(resolver,
+                Settings.System.HEADS_UP_STOPLIST_VALUES);
+        List<String> stopList = new ArrayList<String>();
+        if (!TextUtils.isEmpty(valuesStoplist)) {
+            stoplist.addAll(Array.asList(valuesStoplist.split("\\|")));
+            mStoplistScroller.setVisible(true);
+            mStoplistScroller.setVlaues(stopList);
+        } else {
+            mStoplistScroller.setVisible(false);
+        }
+        mAddStoplistPref.setValues(stopList);
+
+        final String valuesBlacklist = Settings.System.getString(resolver,
+                Settings.System.HEADS_UP_BLACKLIST_VALUES);
+        List<String> blackList = new ArrayList<String>();
+        if (!TextUtils.isEmpty(valuesBlacklist)) {
+            blackList.addAll(Array.asList(valuesStoplist.split("\\|")));
+            mBlacklistScroller.setVisible(true);
+            mBlacklistScroller.setVlaues(blackList);
+        } else {
+            mBlacklistScroller.setVisible(false);
+        }
+        mAddBlacklistPref.setValues(stopList);
+
+        mAddStoplistPref.setOnPreferenceClickListener(this);
+        mAddBlacklistPref.setOnPreferenceClickListener(this);
     }
 
     @Override
@@ -104,6 +158,34 @@ public class HeadsUp extends SettingsPreferenceFragment implements
             Settings.System.putInt(getContentResolver(),
                     Settings.System.HEADS_UP_TIMEOUT,
                     headsUpTimeOut * 1000); // seconds to milliseconds
+            return true;
+        } else if (preference == mAddStoplistPref) {
+            Collection<String> valueList = (Collection<String>) objValue;
+            if (valueList != null) {
+                Settings.System.putString(getContentResolver(),
+                        Settings.System.HEADS_UP_STOPLIST_VALUES,
+                        TextUtils.join("\\|", valueList));
+                mStoplistScroller.setVisible(true);
+                mStoplistScroller.setValues(valueList);
+            } else {
+                mStoplistScroller.setVisible(false);
+                Settings.System.putString(getContentResolver(),
+                        Settings.System.HEADS_UP_STOPLIST_VALUES, "");
+            }
+            return true;
+        } else if (preference == mAddBlacklistPref) {
+            Collection<String> valueList = (Collection<String>) objValue;
+            if (valueList != null) {
+                Settings.System.putString(getContentResolver(),
+                        Settings.System.HEADS_UP_BLACKLIST_VALUES,
+                        TextUtils.join("\\|", valueList));
+                mBlacklistScroller.setVisible(true);
+                mBlacklistScroller.setValues(valueList);
+            } else {
+                mBlacklistScroller.setVisible(false);
+                Settings.System.putString(getContentResolver(),
+                        Settings.System.HEADS_UP_BLACKLIST_VALUES, "");
+            }
             return true;
         }
         return false;
